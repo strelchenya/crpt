@@ -3,7 +3,6 @@ package com.selsup.crpt.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
-import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import okhttp3.*;
 
@@ -13,7 +12,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Log4j2
 public class CrptApi {
@@ -24,29 +22,23 @@ public class CrptApi {
     private static final int DURATION = 1;
 
     private final OkHttpClient client;
-    @Getter
-    private final AtomicInteger requestCount;
     private final ObjectMapper objectMapper;
     private final Semaphore semaphore;
 
     public CrptApi(TimeUnit timeUnit, int requestLimit) {
         this.client = new OkHttpClient();
-        this.requestCount = new AtomicInteger(0);
         this.objectMapper = new ObjectMapper();
         this.semaphore = new Semaphore(requestLimit);
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(() -> {
-            requestCount.set(0);
-            semaphore.release(requestLimit - semaphore.availablePermits());
-        }, 0, DURATION, timeUnit);
+        scheduler.scheduleAtFixedRate(() ->
+                semaphore.release(requestLimit - semaphore.availablePermits()), 0, DURATION, timeUnit);
     }
 
     public Response createDocument(Document document, String signature) {
         Response response = null;
         try {
             semaphore.acquire();
-            requestCount.incrementAndGet();
 
             String content = objectMapper.writeValueAsString(document);
             var requestBody = RequestBody.create(content, CONTENT_TYPE);
